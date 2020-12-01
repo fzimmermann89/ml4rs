@@ -1,3 +1,0 @@
-gt.bmp filter=lfs diff=lfs merge=lfs -text
-t1.bmp filter=lfs diff=lfs merge=lfs -text
-t2.bmp filter=lfs diff=lfs merge=lfs -text
