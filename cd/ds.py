@@ -33,18 +33,14 @@ class CDDataset(Dataset):
 
     cache = {}
     def loadrgb(self, image):
-      if image not in cache:
-        cache[image]=self._loadrgb(image)
-      return cache[image]  
+      if image not in self.cache:
+        self.cache[image]=self._loadrgb(image)
+      return self.cache[image]  
     
     def loadcm(self, image):
-      if image not in cache:
-        cache[image]=self._loadcm(image)
-      return cache[image]
-
-
-    def loadrgb(self):
-        raise NotImplementedError
+      if image not in self.cache:
+        self.cache[image]=self._loadcm(image)
+      return self.cache[image]
 
     def __init__(self):
         if self.imagesets is None or self.patchsize is None:
