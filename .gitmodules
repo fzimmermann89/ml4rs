@@ -1,0 +1,3 @@
+[submodule "cddatasets"]
+	path = DS
+	url = https://gitlab.com/fzimmermann89/cddatasets
