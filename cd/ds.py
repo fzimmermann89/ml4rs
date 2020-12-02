@@ -93,7 +93,7 @@ class WV_S1(CDDataset):
         return np.array(Image.open(image)).transpose(2, 0, 1) / 255
 
     def _loadcm(self, image):
-        return np.array(Image.open(image)) > 1
+        return np.array(Image.open(image)) < 128
 
 
 class OSCD(CDDataset):
