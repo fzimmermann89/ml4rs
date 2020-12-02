@@ -31,6 +31,18 @@ class CDDataset(Dataset):
     normalize = True
     augment = False
 
+    cache = {}
+    def loadrgb(self, image):
+      if image not in cache:
+        cache[image]=self._loadrgb(image)
+      return cache[image]  
+    
+    def loadcm(self, image):
+      if image not in cache:
+        cache[image]=self._loadcm(image)
+      return cache[image]
+
+
     def loadrgb(self):
         raise NotImplementedError
 
@@ -81,10 +93,10 @@ class WV_S1(CDDataset):
         self.patchsize = patchsize
         super(WV_S1, self).__init__()
 
-    def loadrgb(self, image):
+    def _loadrgb(self, image):
         return np.array(Image.open(image)).transpose(2, 0, 1) / 255
 
-    def loadcm(self, image):
+    def _loadcm(self, image):
         return np.array(Image.open(image)) > 1
 
 
@@ -102,10 +114,10 @@ class OSCD(CDDataset):
         self.patchsize = patchsize
         super(OSCD, self).__init__()
 
-    def loadrgb(self, image):
+    def _loadrgb(self, image):
         return np.stack([np.array(Image.open(image / b)) for b in ("B02.tif", "B03.tif", "B04.tif")])
 
-    def loadcm(self, image):
+    def _loadcm(self, image):
         return np.array(Image.open(next(image.glob("*-cm.tif"))))
 
 
