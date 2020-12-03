@@ -33,14 +33,17 @@ class CDDataset(Dataset):
 
     cache = {}
     def loadrgb(self, image):
-      if image not in self.cache:
-        self.cache[image]=self._loadrgb(image)
-      return self.cache[image]  
+      if str(image) not in self.cache:
+        img = self._loadrgb(image)
+        if self.normalize:
+          img = (img-img.mean(axis=(-1,-2))[:,None,None])/img.std(axis=(-1,-2))[:,None,None]
+        self.cache[str(image)] = img
+      return self.cache[str(image)]  
     
     def loadcm(self, image):
-      if image not in self.cache:
-        self.cache[image]=self._loadcm(image)
-      return self.cache[image]
+      if str(image) not in self.cache:
+        self.cache[str(image)]=self._loadcm(image)
+      return self.cache[str(image)]
 
     def __init__(self):
         if self.imagesets is None or self.patchsize is None:
@@ -50,7 +53,6 @@ class CDDataset(Dataset):
             im1 = self.loadrgb(imset.t1)
             im2 = self.loadrgb(imset.t2)
             cm = self.loadcm(imset.cm)
-
             assert im1.shape[1:] == im2.shape[1:] == cm.shape
             assert im1.shape[0] == im2.shape[0] == 3
             self.patches = []
@@ -65,15 +67,13 @@ class CDDataset(Dataset):
                     )
             self.nx += ix / len(self.imagesets)
             self.ny += iy / len(self.imagesets)
-
+        self._m=m
+        self._s=np.sqrt(v)
     def __getitem__(self, idx):
         patch = self.patches[idx]
         im1 = self.loadrgb(patch.imset.t1).astype(np.float64)
         im2 = self.loadrgb(patch.imset.t2).astype(np.float64)
         cm = self.loadcm(patch.imset.cm).astype(bool)
-        if self.normalize:
-            im1 = (im1 - im1.mean((-1, -2))[..., None, None]) / im1.std((-1, -2))[..., None, None]
-            im2 = (im2 - im2.mean((-1, -2))[..., None, None]) / im2.std((-1, -2))[..., None, None]
         im1 = im1[..., patch.x[0] : patch.x[1], patch.y[0] : patch.y[1]]
         im2 = im2[..., patch.x[0] : patch.x[1], patch.y[0] : patch.y[1]]
         cm = cm[..., patch.x[0] : patch.x[1], patch.y[0] : patch.y[1]]
@@ -111,8 +111,8 @@ class OSCD(CDDataset):
         super(OSCD, self).__init__()
 
     def _loadrgb(self, image):
-        return np.stack([np.array(Image.open(image / b)) for b in ("B02.tif", "B03.tif", "B04.tif")])
-
+        img = np.stack([np.array(Image.open(image / b)) for b in ("B02.tif", "B03.tif", "B04.tif")])
+        
     def _loadcm(self, image):
         return np.array(Image.open(next(image.glob("*-cm.tif"))))
 
