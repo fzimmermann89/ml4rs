@@ -29,14 +29,13 @@ class CDDataset(Dataset):
     ny = 0
     patches = []
     normalize = True
-    augment = False
 
     cache = {}
     def loadrgb(self, image):
       if str(image) not in self.cache:
         img = self._loadrgb(image)
-        if self.normalize:
-          img = (img-img.mean(axis=(-1,-2))[:,None,None])/img.std(axis=(-1,-2))[:,None,None]
+        #if self.normalize:
+        #  img = (img-img.mean(axis=(-1,-2))[:,None,None])/img.std(axis=(-1,-2))[:,None,None]
         self.cache[str(image)] = img
       return self.cache[str(image)]  
     
@@ -49,13 +48,13 @@ class CDDataset(Dataset):
         if self.imagesets is None or self.patchsize is None:
             raise NotImplementedError
         m, v = np.zeros(3), np.zeros(3)
+        self.patches = []
         for imset in self.imagesets:
             im1 = self.loadrgb(imset.t1)
             im2 = self.loadrgb(imset.t2)
             cm = self.loadcm(imset.cm)
             assert im1.shape[1:] == im2.shape[1:] == cm.shape
-            assert im1.shape[0] == im2.shape[0] == 3
-            self.patches = []
+            assert im1.shape[0] == im2.shape[0] == 3    
             for ix in range(im1.shape[1] // self.patchsize):
                 for iy in range(im1.shape[2] // self.patchsize):
                     self.patches.append(
@@ -76,6 +75,9 @@ class CDDataset(Dataset):
         cm = self.loadcm(patch.imset.cm).astype(bool)
         im1 = im1[..., patch.x[0] : patch.x[1], patch.y[0] : patch.y[1]]
         im2 = im2[..., patch.x[0] : patch.x[1], patch.y[0] : patch.y[1]]
+        if self.normalize:
+          im1=(im1-im1.mean(axis=(-1,-2))[:,None,None])/im1.std(axis=(-1,-2))[:,None,None]
+          im2=(im2-im2.mean(axis=(-1,-2))[:,None,None])/im2.std(axis=(-1,-2))[:,None,None]
         cm = cm[..., patch.x[0] : patch.x[1], patch.y[0] : patch.y[1]]
         return (im1, im2, cm)
 
@@ -111,10 +113,10 @@ class OSCD(CDDataset):
         super(OSCD, self).__init__()
 
     def _loadrgb(self, image):
-        img = np.stack([np.array(Image.open(image / b)) for b in ("B02.tif", "B03.tif", "B04.tif")])
+        return np.stack([np.array(Image.open(image / b)) for b in ("B02.tif", "B03.tif", "B04.tif")])
         
     def _loadcm(self, image):
-        return np.array(Image.open(next(image.glob("*-cm.tif"))))
+        return np.array(Image.open(next(image.glob("*-cm.tif"))))>1
 
 
 from typing import Tuple
