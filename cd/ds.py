@@ -6,6 +6,7 @@ import numpy as np
 from dataclasses import dataclass
 import random
 
+
 @dataclass
 class imageset:
     t1: Path
@@ -31,18 +32,21 @@ class CDDataset(Dataset):
     normalize = True
 
     cache = {}
+
     def loadrgb(self, image):
-      if str(image) not in self.cache:
-        img = self._loadrgb(image)
-        #if self.normalize:
-        #  img = (img-img.mean(axis=(-1,-2))[:,None,None])/img.std(axis=(-1,-2))[:,None,None]
-        self.cache[str(image)] = img
-      return self.cache[str(image)]  
-    
+        if image not in self.cache:
+            img = self._loadrgb(image).astype(np.float32)
+            if self.normalize:
+                img = (img - img.mean(axis=(-1, -2))[:, None, None]) / img.std(
+                    axis=(-1, -2)
+                )[:, None, None]
+            self.cache[image] = img
+        return self.cache[image]
+
     def loadcm(self, image):
-      if str(image) not in self.cache:
-        self.cache[str(image)]=self._loadcm(image)
-      return self.cache[str(image)]
+        if image not in self.cache:
+            self.cache[image] = self._loadcm(image).astype(np.int64)
+        return self.cache[image]
 
     def __init__(self):
         if self.imagesets is None or self.patchsize is None:
@@ -54,7 +58,7 @@ class CDDataset(Dataset):
             im2 = self.loadrgb(imset.t2)
             cm = self.loadcm(imset.cm)
             assert im1.shape[1:] == im2.shape[1:] == cm.shape
-            assert im1.shape[0] == im2.shape[0] == 3    
+            assert im1.shape[0] == im2.shape[0] == 3
             for ix in range(im1.shape[1] // self.patchsize):
                 for iy in range(im1.shape[2] // self.patchsize):
                     self.patches.append(
@@ -66,18 +70,19 @@ class CDDataset(Dataset):
                     )
             self.nx += ix / len(self.imagesets)
             self.ny += iy / len(self.imagesets)
-        self._m=m
-        self._s=np.sqrt(v)
+        self._m = m
+        self._s = np.sqrt(v)
+
     def __getitem__(self, idx):
         patch = self.patches[idx]
-        im1 = self.loadrgb(patch.imset.t1).astype(np.float64)
-        im2 = self.loadrgb(patch.imset.t2).astype(np.float64)
-        cm = self.loadcm(patch.imset.cm).astype(bool)
+        im1 = self.loadrgb(patch.imset.t1)
+        im2 = self.loadrgb(patch.imset.t2)
+        cm = self.loadcm(patch.imset.cm)
         im1 = im1[..., patch.x[0] : patch.x[1], patch.y[0] : patch.y[1]]
         im2 = im2[..., patch.x[0] : patch.x[1], patch.y[0] : patch.y[1]]
-        if self.normalize:
-          im1=(im1-im1.mean(axis=(-1,-2))[:,None,None])/im1.std(axis=(-1,-2))[:,None,None]
-          im2=(im2-im2.mean(axis=(-1,-2))[:,None,None])/im2.std(axis=(-1,-2))[:,None,None]
+        #         if self.normalize:
+        #           im1=(im1-im1.mean(axis=(-1,-2))[:,None,None])/im1.std(axis=(-1,-2))[:,None,None]
+        #           im2=(im2-im2.mean(axis=(-1,-2))[:,None,None])/im2.std(axis=(-1,-2))[:,None,None]
         cm = cm[..., patch.x[0] : patch.x[1], patch.y[0] : patch.y[1]]
         return (im1, im2, cm)
 
@@ -113,10 +118,12 @@ class OSCD(CDDataset):
         super(OSCD, self).__init__()
 
     def _loadrgb(self, image):
-        return np.stack([np.array(Image.open(image / b)) for b in ("B02.tif", "B03.tif", "B04.tif")])
-        
+        return np.stack(
+            [np.array(Image.open(image / b)) for b in ("B02.tif", "B03.tif", "B04.tif")]
+        )
+
     def _loadcm(self, image):
-        return np.array(Image.open(next(image.glob("*-cm.tif"))))>1
+        return np.array(Image.open(next(image.glob("*-cm.tif")))) > 1
 
 
 from typing import Tuple
@@ -137,7 +144,9 @@ def split(
     train = list()
     split = np.array_split(np.arange(len(ds)), len(ds) / runsize)
     for s in split:
-        nv = int(validation_ratio * (len(val) + len(test) + len(train) + len(s)) - len(val))
+        nv = int(
+            validation_ratio * (len(val) + len(test) + len(train) + len(s)) - len(val)
+        )
         i = rng.choice(s, nv, replace=False)
         s = np.setdiff1d(s, i)
         val += i.tolist()
@@ -157,15 +166,25 @@ class CDSubset(Subset):
     augment = False
 
     def __getitem__(self, idx):
-        im1, im2, cm = super().__getitem__(idx)
+        items = super().__getitem__(idx)
         if self.augment:
             if random.randint(0, 1):
-                im1 = np.swapaxes(im1, -1, -2)
-                im2 = np.swapaxes(im2, -1, -2)
-                cm = np.swapaxes(cm, -1, -2)
+                items = [np.swapaxes(item, -1, -2) for item in items]
             rot = random.randint(0, 3)
-            im1 = np.copy(np.rot90(im1, rot, (-1, -2)))
-            im2 = np.copy(np.rot90(im2, rot, (-1, -2)))
-            cm = np.copy(np.rot90(cm, rot, (-1, -2)))
+            items = [np.copy(np.rot90(item, rot, (-1, -2))) for item in items]
+        return items
 
-        return im1, im2, cm
+class CDCat(Dataset):
+    """
+    Concats the two images along first dimension
+    """
+    def __init__(self, baseObject):
+        self.__class__ = type(baseObject.__class__.__name__,
+                  (self.__class__, baseObject.__class__),
+                  {})
+        self.__dict__ = baseObject.__dict__
+        self.baseObject=baseObject
+    def __getitem__(self, idx):
+        im1, im2, cm = self.baseObject[idx]
+        return np.concatenate((im1,im2),0),cm
+    

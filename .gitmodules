@@ -1,6 +1,9 @@
 [submodule "cddatasets"]
 	path = DS
-	url = https://gitlab.com/fzimmermann89/cddatasets
+	url = https://gitlab.com/fzimmermann89/cddatasets.git
 [submodule "GAN"]
 	path = GAN
 	url = https://thuyduongtt@gitlab.com/thuyduongtt/gan-cd.git
+[submodule "cd/models/sscdnet"]
+	path = cd/models/sscdnet
+	url = https://github.com/xdspacelab/sscdnet
